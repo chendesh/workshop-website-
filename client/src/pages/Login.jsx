@@ -13,7 +13,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const user = await login({ username: username.trim(), password });
+      const user = await login({ username: username.trim().toLowerCase(), password });
       if (user) {
         navigate(user.role === 'owner' ? '/owner' : '/worker');
       }
@@ -47,6 +47,9 @@ export default function Login() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. owner@excavation.com"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck="false"
             />
           </div>
 

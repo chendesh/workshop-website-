@@ -16,7 +16,9 @@ const JWT_EXPIRES_IN = '24h';
 
 export const signup = async (req, res) => {
   try {
-    const { username, password, fullName } = req.body;
+    const { password, fullName } = req.body;
+    // Always store username in lowercase to ensure consistent login
+    const username = (req.body.username || '').trim().toLowerCase();
 
     // Check if an owner already exists
     const ownerSnap = await db.collection('users').where('role', '==', 'owner').limit(1).get();
@@ -68,8 +70,9 @@ export const signup = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const normalizedUsername = (username || '').trim();
+    const { password } = req.body;
+    // Normalize to lowercase so login works regardless of what the client sends
+    const normalizedUsername = (req.body.username || '').trim().toLowerCase();
 
     // Find user by username
     const userSnap = await db.collection('users').where('username', '==', normalizedUsername).limit(1).get();

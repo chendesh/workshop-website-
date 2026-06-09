@@ -135,10 +135,10 @@ function validStringLength(field, minLen, maxLen) {
      request.resource.data[field].size() <= maxLen;
 }
 //
-// Validate URL format (must start with https:// or http://)
+// Validate URL format (must start with https:// or https://)
 function isValidUrl(url) {
    return url is string &&
-     (url.matches("^https://.*") || url.matches("^http://.*"));
+     (url.matches("^https://.*") || url.matches("^https://.*"));
 }
 //
 // Validate email format

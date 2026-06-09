@@ -9,7 +9,7 @@ import RupeeDisplay from '../../components/RupeeDisplay';
 // ── Workshop SVG Illustration ───────────────────────────────────
 function WorkshopIllustration() {
   return (
-    <svg viewBox="0 0 600 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto opacity-80">
+    <svg viewBox="0 0 600 200" fill="none" xmlns="https://www.w3.org/2000/svg" className="w-full h-auto opacity-80">
       {/* Ground */}
       <rect x="0" y="170" width="600" height="30" rx="4" fill="url(#ground)" />
       {/* Building */}

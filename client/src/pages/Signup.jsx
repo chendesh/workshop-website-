@@ -16,7 +16,8 @@ export default function Signup() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.post('/auth/signup', formData);
+      const submitData = { ...formData, username: formData.username.trim().toLowerCase() };
+      const res = await api.post('/auth/signup', submitData);
       toast.success(res.data.message);
       navigate('/login');
     } catch (error) {
@@ -50,6 +51,9 @@ export default function Signup() {
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 focus:border-amber-500"
               value={formData.username}
               onChange={(e) => setFormData({...formData, username: e.target.value})}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck="false"
             />
           </div>
           <div>

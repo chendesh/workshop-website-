@@ -68,7 +68,7 @@ export default function Reports() {
       // So if it succeeds via an API call, we need a way to trigger download in browser.
       // Easiest is to window.open the download endpoint url.
       const token = localStorage.getItem('digiwork_token');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://localhost:5000/api';
       // We can't easily pass headers via window.open so if auth is required, we do it via fetch.
       toast('Downloading file...');
       try {
