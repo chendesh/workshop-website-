@@ -25,8 +25,8 @@ if (!serviceAccount && process.env.FIREBASE_PROJECT_ID) {
     type: 'service_account',
     project_id: process.env.FIREBASE_PROJECT_ID,
     client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    // Replace escaped newlines so the PEM key is valid
-    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    // Strip quotes if they accidentally copied them, then replace escaped newlines
+    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/^"|"$/g, '').replace(/\\n/g, '\n'),
   };
 }
 
