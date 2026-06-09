@@ -30,7 +30,7 @@ app.use('/api/camps', campsRoutes);
 app.use('/api/reports', reportsRoutes);
 
 // ── Serve Frontend (React SPA) ─────────────────────────────
-const clientDistPath = path.join(__dirname, '../../client/dist');
+const clientDistPath = path.join(__dirname, '../public');
 app.use(express.static(clientDistPath));
 
 // Catch-all: send index.html for any non-API route (React Router handles it)
