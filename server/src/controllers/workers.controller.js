@@ -88,6 +88,7 @@ export const createWorker = async (req, res) => {
       phone: phone || '',
       designation: designation || '',
       dailyRate: Number(dailyRate) || 0,
+      advanceAmount: 0,
       joinDate: joinDate || '',
       photoUrl: photoUrl || '',
       isActive: true,
@@ -149,7 +150,7 @@ export const createWorker = async (req, res) => {
 export const updateWorker = async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, phone, designation, dailyRate, joinDate, photoUrl } = req.body;
+    const { fullName, phone, designation, dailyRate, advanceAmount, joinDate, photoUrl } = req.body;
 
     const workerRef = db.collection('workers').doc(id);
     const workerDoc = await workerRef.get();
@@ -163,6 +164,7 @@ export const updateWorker = async (req, res) => {
     if (phone !== undefined) updates.phone = phone;
     if (designation !== undefined) updates.designation = designation;
     if (dailyRate !== undefined) updates.dailyRate = Number(dailyRate);
+    if (advanceAmount !== undefined) updates.advanceAmount = Number(advanceAmount);
     if (joinDate !== undefined) updates.joinDate = joinDate;
     if (photoUrl !== undefined) updates.photoUrl = photoUrl;
     updates.updatedAt = nowISO();

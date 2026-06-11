@@ -9,6 +9,7 @@ export default function WorkerForm({ worker, onClose, onSuccess }) {
     phone: '',
     designation: 'Helper',
     dailyRate: '',
+    advanceAmount: 0,
     joinDate: new Date().toISOString().split('T')[0]
   });
   const [loading, setLoading] = useState(false);
@@ -20,6 +21,7 @@ export default function WorkerForm({ worker, onClose, onSuccess }) {
         phone: worker.phone || '',
         designation: worker.designation || 'Helper',
         dailyRate: worker.dailyRate || '',
+        advanceAmount: worker.advanceAmount || 0,
         joinDate: worker.joinDate ? worker.joinDate.split('T')[0] : new Date().toISOString().split('T')[0]
       });
     }
@@ -35,7 +37,8 @@ export default function WorkerForm({ worker, onClose, onSuccess }) {
     try {
       const payload = {
         ...formData,
-        dailyRate: Number(formData.dailyRate)
+        dailyRate: Number(formData.dailyRate),
+        advanceAmount: Number(formData.advanceAmount)
       };
 
       if (worker) {
@@ -79,6 +82,10 @@ export default function WorkerForm({ worker, onClose, onSuccess }) {
           <div>
             <label className="block text-sm text-slate-400 mb-1">Daily Rate (₹)</label>
             <input type="number" name="dailyRate" required value={formData.dailyRate} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100" />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Advance (₹)</label>
+            <input type="number" name="advanceAmount" value={formData.advanceAmount} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100" />
           </div>
           <div>
             <label className="block text-sm text-slate-400 mb-1">Join Date</label>

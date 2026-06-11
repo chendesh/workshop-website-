@@ -60,6 +60,7 @@ export default function Workers() {
     { key: 'phone', label: 'Phone' },
     { key: 'designation', label: 'Designation' },
     { key: 'dailyRate', label: 'Daily Rate', render: (val) => <RupeeDisplay amount={val} /> },
+    { key: 'advanceAmount', label: 'Advance', render: (val) => <RupeeDisplay amount={val || 0} /> },
     { 
       key: 'isActive', 
       label: 'Status', 

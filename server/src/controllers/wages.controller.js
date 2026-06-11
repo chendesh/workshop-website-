@@ -337,21 +337,44 @@ export const saveDailyWages = async (req, res) => {
 
     const batch = db.batch();
 
-    records.forEach((record) => {
+    for (const record of records) {
       // Create a unique deterministic ID for the day + worker
       const docId = `DW-${date.replace(/\//g, '')}-${record.workerId}`;
       const docRef = db.collection('dailyWages').doc(docId);
+      
+      // Fetch worker to get dailyRate
+      const workerRef = db.collection('workers').doc(record.workerId);
+      const workerDoc = await workerRef.get();
+      const worker = workerDoc.exists ? workerDoc.data() : {};
+      
+      const dailyRate = worker.dailyRate || 0;
+      const amount = Number(record.amount) || 0;
+      
+      const newAdvanceAdded = Math.max(0, amount - dailyRate);
+      const baseAmount = Math.min(amount, dailyRate);
+      
+      // Fetch old daily wage to check previous advance added
+      const oldDoc = await docRef.get();
+      const oldAdvanceAdded = oldDoc.exists ? (oldDoc.data().advanceAdded || 0) : 0;
+      
+      const advanceDelta = newAdvanceAdded - oldAdvanceAdded;
+      if (advanceDelta !== 0 && worker.id) {
+          const newAdvanceAmount = (worker.advanceAmount || 0) + advanceDelta;
+          batch.update(workerRef, { advanceAmount: newAdvanceAmount, updatedAt: nowISO() });
+      }
       
       batch.set(docRef, {
         id: docId,
         date,
         workerId: record.workerId,
         workerName: record.workerName,
-        amount: Number(record.amount) || 0,
+        amount,
+        baseAmount,
+        advanceAdded: newAdvanceAdded,
         status: record.status || 'not_paid', // 'paid' or 'not_paid'
         updatedAt: nowISO()
       }, { merge: true });
-    });
+    }
 
     await batch.commit();
 

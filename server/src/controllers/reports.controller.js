@@ -146,16 +146,18 @@ async function fetchReportData(periodStartStr, periodEndStr) {
     dailyWages.forEach(w => {
         const normDate = w.date.includes('-') ? formatDate(parseDate(w.date)) : w.date;
         const key = `${normDate}_${w.workerId}`;
+        const wageAmount = w.baseAmount !== undefined ? w.baseAmount : w.amount;
+
         if (!workerDataMap[key]) {
              workerDataMap[key] = {
                  date: normDate,
                  workerName: w.workerName,
                  attendance: 'unrecorded',
-                 wage: w.amount,
+                 wage: wageAmount,
                  paymentStatus: w.status
              };
         } else {
-             workerDataMap[key].wage = w.amount;
+             workerDataMap[key].wage = wageAmount;
              workerDataMap[key].paymentStatus = w.status;
         }
     });
