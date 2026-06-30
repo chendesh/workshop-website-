@@ -458,9 +458,7 @@ export const generateMonthlyReport = async (req, res) => {
     // periodStart and periodEnd are YYYY-MM-DD, parse directly
     const startStr = formatDate(new Date(periodStart));
     const endStr = formatDate(new Date(periodEnd));
-
-    const { workLogs, workersData, inventoryItems } = await fetchReportData(startStr, endStr);
-
+    const { workLogs, workersData, inventoryItems, campsData } = await fetchReportData(startStr, endStr);
     // ── Build PDF ──
     const doc = new jsPDF();
     
