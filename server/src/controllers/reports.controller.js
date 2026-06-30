@@ -191,7 +191,28 @@ async function fetchReportData(periodStartStr, periodEndStr) {
       return da - db2;
     });
 
-    return { workLogs, workersData, inventoryItems };
+    // 4. Camps
+    const campsSnap = await db.collection('campEntries').get();
+    const camps = campsSnap.docs
+      .map((doc) => doc.data())
+      .filter((camp) => {
+         const campDate = parseDate(camp.startDate);
+         return campDate >= startObj && campDate <= endObj;
+      });
+
+    const campWorkersSnap = await db.collection('campWorkers').get();
+    const allCampWorkers = campWorkersSnap.docs.map(doc => doc.data());
+
+    const campsData = camps.map(camp => {
+       return {
+           ...camp,
+           workers: allCampWorkers.filter(cw => cw.campId === camp.id)
+       };
+    });
+
+    campsData.sort((a, b) => parseDate(a.startDate) - parseDate(b.startDate));
+
+    return { workLogs, workersData, inventoryItems, campsData };
 }
 
 
@@ -208,7 +229,7 @@ export const generateWeeklyReport = async (req, res) => {
     const startStr = formatDate(new Date(periodStart));
     const endStr = formatDate(new Date(periodEnd));
 
-    const { workLogs, workersData, inventoryItems } = await fetchReportData(startStr, endStr);
+    const { workLogs, workersData, inventoryItems, campsData } = await fetchReportData(startStr, endStr);
 
     // ── Build Excel workbook ──
     const wb = XLSX.utils.book_new();
@@ -339,6 +360,65 @@ export const generateWeeklyReport = async (req, res) => {
     matSheet['!cols'] = [14, 22, 18, 10, 8, 14, 16, 22, 30].map((w) => ({ wch: w }));
 
     XLSX.utils.book_append_sheet(wb, matSheet, 'Materials Report');
+
+    // Section D: Camp Details
+    let totalCampsWorkAmount = 0;
+    const campHeaders = ['Camp Location', 'Dates', 'Total Work Amount (₹)', 'Assigned Workers & Amounts'];
+    const campData = campsData.map((camp) => {
+        const totalAmt = Number(camp.totalWorkAmount) || 0;
+        totalCampsWorkAmount += totalAmt;
+        const workersStr = (camp.workers || []).map(w => `${w.workerName} (₹${w.campPay})`).join(', ');
+        return [
+            camp.location || '',
+            `${formatDate(camp.startDate)} to ${formatDate(camp.endDate)}`,
+            totalAmt,
+            workersStr || 'None'
+        ];
+    });
+
+    const campSheetData = [
+      ['Camp Details Report'],
+      [`Period: ${startStr} to ${endStr}`],
+      [],
+      campHeaders,
+      ...campData,
+    ];
+
+    if (campData.length === 0) {
+      campSheetData.push(['No camps recorded for this period.']);
+    } else {
+      campSheetData.push([]);
+      campSheetData.push(['Grand Total:', '', totalCampsWorkAmount, '']);
+    }
+
+    const campSheet = XLSX.utils.aoa_to_sheet(campSheetData);
+    const campHeaderRowIndex = 3;
+    if (!campSheet['!rows']) campSheet['!rows'] = [];
+    campSheet['!rows'][campHeaderRowIndex] = { hpx: 20 };
+
+    ['A', 'B', 'C', 'D'].forEach((col) => {
+      const cellRef = `${col}${campHeaderRowIndex + 1}`;
+      if (!campSheet[cellRef]) campSheet[cellRef] = { v: '', t: 's' };
+      campSheet[cellRef].s = {
+        fill: { fgColor: { rgb: '9B59B6' } }, // Purple header
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        alignment: { horizontal: 'center' },
+      };
+    });
+
+    const campDataStartRow = campHeaderRowIndex + 2;
+    campData.forEach((_, i) => {
+      const cellRef = `C${campDataStartRow + i}`;
+      if (campSheet[cellRef]) {
+        campSheet[cellRef].s = { font: { bold: true } };
+      }
+    });
+
+    campSheet['!freeze'] = { xSplit: 0, ySplit: campHeaderRowIndex + 1 };
+    campSheet['!cols'] = [30, 25, 20, 50].map((w) => ({ wch: w }));
+
+    XLSX.utils.book_append_sheet(wb, campSheet, 'Camp Details');
+
 
     // Save file
     const fileName = `weekly-report-${startStr.replace(/\//g, '-')}.xlsx`;
@@ -570,6 +650,86 @@ export const generateMonthlyReport = async (req, res) => {
           6: { cellWidth: 30, halign: 'left' }
       },
       alternateRowStyles: { fillColor: [248, 250, 252] },
+      tableLineColor: [200, 200, 200],
+      tableLineWidth: 0.1,
+      footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' }
+    });
+
+    // ── Section D: Camp Details ──
+    const matFinalY = doc.lastAutoTable.finalY || 54;
+
+    if (matFinalY > pageHeight - 50) {
+      doc.addPage();
+      doc.setFontSize(14);
+      doc.setTextColor(155, 89, 182); // purple #9B59B6
+      doc.setFont(undefined, 'bold');
+      doc.text('Section D: Camp Details', 14, 20);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.setDrawColor(155, 89, 182);
+      doc.line(14, 23, pageWidth - 14, 23);
+      doc.autoTable.previous.finalY = 27;
+    } else {
+      const campHeadingY = matFinalY + 14;
+      doc.setFontSize(14);
+      doc.setTextColor(155, 89, 182);
+      doc.setFont(undefined, 'bold');
+      doc.text('Section D: Camp Details', 14, campHeadingY);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.setDrawColor(155, 89, 182);
+      doc.line(14, campHeadingY + 3, pageWidth - 14, campHeadingY + 3);
+      doc.autoTable.previous.finalY = campHeadingY + 7;
+    }
+
+    let pdfTotalCampsWorkAmount = 0;
+    let pdfCampBody;
+
+    if (campsData.length === 0) {
+      pdfCampBody = [[{ content: 'No camps recorded for this period.', colSpan: 4, styles: { halign: 'center', fontStyle: 'italic', textColor: [100, 100, 100] } }]];
+    } else {
+      pdfCampBody = campsData.map((camp) => {
+        const totalAmt = Number(camp.totalWorkAmount) || 0;
+        pdfTotalCampsWorkAmount += totalAmt;
+        
+        let dateStr = '';
+        if (camp.startDate && camp.endDate) {
+          dateStr = `${formatDate(camp.startDate)} to ${formatDate(camp.endDate)}`;
+        } else if (camp.startDate) {
+          dateStr = formatDate(camp.startDate);
+        }
+        
+        const workersStr = (camp.workers || []).map(w => `${w.workerName} (₹${w.campPay})`).join(', ');
+
+        return [
+          camp.location || '',
+          dateStr,
+          formatRupees(totalAmt),
+          workersStr || 'None',
+        ];
+      });
+
+      pdfCampBody.push([
+        { content: 'Grand Total', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } },
+        { content: formatRupees(pdfTotalCampsWorkAmount), styles: { fontStyle: 'bold', textColor: [155, 89, 182], halign: 'right' } },
+        ''
+      ]);
+    }
+
+    doc.autoTable({
+      startY: doc.autoTable.previous.finalY,
+      head: [['Camp Location', 'Dates', 'Total Work Amount (₹)', 'Assigned Workers & Amounts']],
+      body: pdfCampBody,
+      theme: 'grid',
+      headStyles: { fillColor: [155, 89, 182], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+      styles: { font: 'Roboto', fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
+      columnStyles: {
+          0: { cellWidth: 40, halign: 'left' },
+          1: { cellWidth: 35, halign: 'center' },
+          2: { cellWidth: 35, halign: 'right' },
+          3: { cellWidth: 'auto', halign: 'left' }
+      },
+      alternateRowStyles: { fillColor: [250, 248, 252] }, // Light purple striping
       tableLineColor: [200, 200, 200],
       tableLineWidth: 0.1,
       footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' }

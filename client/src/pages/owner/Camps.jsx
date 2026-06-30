@@ -56,6 +56,7 @@ export default function Camps() {
     { key: 'startDate', label: 'Start Date', render: (val) => formatDate(val) },
     { key: 'endDate', label: 'End Date', render: (val) => formatDate(val) },
     { key: 'durationDays', label: 'Duration (Days)' },
+    { key: 'totalWorkAmount', label: 'Total Amount (₹)', render: (val) => val ? `₹${val}` : '—' },
     { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
     {
       key: 'actions',

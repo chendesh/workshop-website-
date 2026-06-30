@@ -41,6 +41,7 @@ export const createCamp = async (req, res) => {
       description,
       status,
       notes,
+      totalWorkAmount,
     } = req.body;
 
     const campId = generateId('CMP');
@@ -53,6 +54,7 @@ export const createCamp = async (req, res) => {
       description: description || '',
       status: status || 'upcoming',
       notes: notes || '',
+      totalWorkAmount: Number(totalWorkAmount) || 0,
       createdAt: nowISO(),
     };
 
@@ -81,6 +83,9 @@ export const updateCamp = async (req, res) => {
     const updates = { ...req.body, updatedAt: nowISO() };
     if (updates.durationDays !== undefined) {
       updates.durationDays = Number(updates.durationDays);
+    }
+    if (updates.totalWorkAmount !== undefined) {
+      updates.totalWorkAmount = Number(updates.totalWorkAmount);
     }
 
     await campRef.update(updates);
