@@ -126,11 +126,11 @@ export default function Reports() {
         <div className="flex flex-wrap items-end gap-3 bg-slate-800 p-3 rounded-xl border border-slate-700">
           <div>
              <label className="block text-xs text-slate-400 mb-1">Start Date</label>
-             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100" />
+             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} onKeyDown={(e) => e.preventDefault()} className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500" />
           </div>
           <div>
              <label className="block text-xs text-slate-400 mb-1">End Date</label>
-             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100" />
+             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} onKeyDown={(e) => e.preventDefault()} className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500" />
           </div>
           <div className="flex gap-2 ml-2">
             <button

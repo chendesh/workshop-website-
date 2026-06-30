@@ -88,7 +88,8 @@ export default function Attendance() {
               type="date" 
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100"
+              onKeyDown={(e) => e.preventDefault()}
+              className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
           <div className="flex gap-2">
