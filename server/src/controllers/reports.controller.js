@@ -68,29 +68,54 @@ export const downloadReport = async (req, res) => {
 
     const report = reportDoc.data();
 
-    if (!existsSync(report.filePath)) {
-      return errorResponse(res, 'Report file not found on server.', 404);
+    // If we have a permanent URL stored, just return it
+    if (report.fileUrl) {
+      return successResponse(res, { fileUrl: report.fileUrl }, 'Download URL retrieved.');
     }
 
-    const fileBuffer = readFileSync(report.filePath);
+    // Fallback for older reports that might still exist on local disk
+    if (existsSync(report.filePath)) {
+      const fileBuffer = readFileSync(report.filePath);
+      const contentType = report.type === 'weekly'
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : 'application/pdf';
 
-    // Set appropriate content type
-    const contentType = report.type === 'weekly'
-      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      : 'application/pdf';
+      res.set({
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${report.fileName}"`,
+        'Content-Length': fileBuffer.length,
+      });
 
-    res.set({
-      'Content-Type': contentType,
-      'Content-Disposition': `attachment; filename="${report.fileName}"`,
-      'Content-Length': fileBuffer.length,
-    });
+      return res.send(fileBuffer);
+    }
 
-    return res.send(fileBuffer);
+    return errorResponse(res, 'File no longer available, please regenerate.', 404);
   } catch (error) {
     console.error('DownloadReport error:', error);
     return errorResponse(res, 'Failed to download report.');
   }
 };
+
+// ── Shared Storage Upload Logic ──────────────────────────────
+async function uploadToFirebaseStorage(filePath, fileName, mimeType) {
+  try {
+    const { bucket } = await import('../config/firebase.js');
+    const destination = `reports/${fileName}`;
+    await bucket.upload(filePath, {
+      destination,
+      metadata: { contentType: mimeType }
+    });
+    const file = bucket.file(destination);
+    const [url] = await file.getSignedUrl({
+      action: 'read',
+      expires: '01-01-2100'
+    });
+    return url;
+  } catch (e) {
+    console.error('Upload to storage failed:', e);
+    return null; // Gracefully fallback if bucket isn't properly configured yet
+  }
+}
 
 // ── Shared Data Fetching Logic ──────────────────────────────
 async function fetchReportData(periodStartStr, periodEndStr) {
@@ -420,10 +445,12 @@ export const generateWeeklyReport = async (req, res) => {
     XLSX.utils.book_append_sheet(wb, campSheet, 'Camp Details');
 
 
-    // Save file
+    // Save file locally temporarily
     const fileName = `weekly-report-${startStr.replace(/\//g, '-')}.xlsx`;
     const filePath = join(REPORTS_DIR, fileName);
     XLSX.writeFile(wb, filePath);
+
+    const fileUrl = await uploadToFirebaseStorage(filePath, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
     // Save report record to Firestore
     const reportId = generateId('RPT');
@@ -433,7 +460,8 @@ export const generateWeeklyReport = async (req, res) => {
       periodStart: startStr,
       periodEnd: endStr,
       fileName,
-      filePath,
+      filePath, // keep for fallback/debugging
+      fileUrl: fileUrl || null,
       generatedAt: nowISO(),
     };
     await db.collection('reports').doc(reportId).set(reportData);
@@ -733,11 +761,13 @@ export const generateMonthlyReport = async (req, res) => {
       footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
 
-    // Save PDF
+    // Save PDF locally temporarily
     const fileName = `monthly-report-${startStr.replace(/\//g, '-')}.pdf`;
     const filePath = join(REPORTS_DIR, fileName);
     const pdfOutput = doc.output('arraybuffer');
     writeFileSync(filePath, Buffer.from(pdfOutput));
+
+    const fileUrl = await uploadToFirebaseStorage(filePath, fileName, 'application/pdf');
 
     // Save report record
     const reportId = generateId('RPT');
@@ -747,7 +777,8 @@ export const generateMonthlyReport = async (req, res) => {
       periodStart: startStr,
       periodEnd: endStr,
       fileName,
-      filePath,
+      filePath, // keep for fallback/debugging
+      fileUrl: fileUrl || null,
       generatedAt: nowISO(),
     };
     await db.collection('reports').doc(reportId).set(reportData);

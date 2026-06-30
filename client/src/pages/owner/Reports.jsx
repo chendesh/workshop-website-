@@ -75,7 +75,11 @@ export default function Reports() {
         const response = await fetch(`${apiUrl}/reports/download/${reportId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!response.ok) throw new Error('Download failed');
+        
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || 'Download failed');
+        }
         
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -91,7 +95,7 @@ export default function Reports() {
         a.remove();
         window.URL.revokeObjectURL(url);
       } catch (err) {
-        toast.error('Failed to download report');
+        toast.error(err.message || 'Failed to download report');
       }
     }
   };

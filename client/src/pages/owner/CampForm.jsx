@@ -46,7 +46,7 @@ export default function CampForm({ camp, onClose, onSuccess }) {
           if (res.data.data && res.data.data.workers) {
             const assigned = res.data.data.workers.map(w => ({
               workerId: w.workerId,
-              campPay: w.campPay || 0
+              campPay: w.campPay || ''
             }));
             setAssignedWorkers(assigned);
           }
@@ -67,12 +67,12 @@ export default function CampForm({ camp, onClose, onSuccess }) {
     if (exists) {
       setAssignedWorkers(assignedWorkers.filter(w => w.workerId !== workerId));
     } else {
-      setAssignedWorkers([...assignedWorkers, { workerId, campPay: 0 }]);
+      setAssignedWorkers([...assignedWorkers, { workerId, campPay: '' }]);
     }
   };
 
   const handleWorkerAmountChange = (workerId, amount) => {
-    setAssignedWorkers(assignedWorkers.map(w => w.workerId === workerId ? { ...w, campPay: Number(amount) } : w));
+    setAssignedWorkers(assignedWorkers.map(w => w.workerId === workerId ? { ...w, campPay: amount === '' ? '' : Number(amount) } : w));
   };
 
   const handleSubmit = async (e) => {
@@ -97,7 +97,11 @@ export default function CampForm({ camp, onClose, onSuccess }) {
 
       // Sync assigned workers
       if (currentCampId && assignedWorkers.length > 0) {
-        await api.post(`/camps/${currentCampId}/workers`, { workers: assignedWorkers });
+        const workersPayload = assignedWorkers.map(w => ({
+          workerId: w.workerId,
+          campPay: w.campPay === '' ? 0 : Number(w.campPay)
+        }));
+        await api.post(`/camps/${currentCampId}/workers`, { workers: workersPayload });
       }
 
       onSuccess();

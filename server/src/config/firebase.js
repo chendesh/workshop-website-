@@ -37,13 +37,15 @@ if (!serviceAccount) {
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
+  storageBucket: process.env.FIREBASE_PROJECT_ID ? `${process.env.FIREBASE_PROJECT_ID}.appspot.com` : 'chess-4eb33.appspot.com'
 });
 
 const db = admin.firestore();
+const bucket = admin.storage().bucket();
 
 // Firestore settings
 db.settings({ ignoreUndefinedProperties: true });
 
 console.log('✅ Firebase Admin SDK initialized');
 
-export { admin, db };
+export { admin, db, bucket };
