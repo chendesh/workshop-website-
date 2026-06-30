@@ -15,8 +15,13 @@
   }
 
   body {
-    @apply bg-brand-dark text-gray-100 font-body antialiased;
+    @apply bg-gray-50 text-gray-900 font-body antialiased;
     min-height: 100vh;
+  }
+
+  html.dark body {
+    background-color: #0f172a;
+    color: #f3f4f6;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -29,140 +34,279 @@
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-slate-900;
+    background-color: #f1f5f9;
+  }
+
+  html.dark ::-webkit-scrollbar-track {
+    background-color: #0f172a;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-600 rounded-full;
+    background-color: #cbd5e1;
+    border-radius: 9999px;
+  }
+
+  html.dark ::-webkit-scrollbar-thumb {
+    background-color: #475569;
+    border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-500;
+    background-color: #94a3b8;
+  }
+
+  html.dark ::-webkit-scrollbar-thumb:hover {
+    background-color: #64748b;
   }
 }
 
 /* ─── Component Styles ─── */
 @layer components {
+
+  /* Cards */
   .glass-card {
-    @apply bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl;
+    @apply bg-white border border-gray-200 rounded-2xl shadow-sm;
+  }
+
+  html.dark .glass-card {
+    background-color: #1e293b;
+    border-color: rgba(51, 65, 85, 0.5);
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300 hover:bg-slate-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/10;
+    @apply glass-card transition-all duration-300
+           hover:border-amber-400/50 hover:shadow-md;
   }
 
+  html.dark .glass-card-hover:hover {
+    background-color: rgba(30, 41, 59, 0.8);
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+
+  /* Text */
   .gradient-text {
-    @apply bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-amber-500 via-orange-400 to-amber-500
+           bg-clip-text text-transparent;
   }
 
   .gradient-text-blue {
-    @apply bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500
+           bg-clip-text text-transparent;
   }
 
+  /* Buttons */
   .btn-primary {
-    @apply px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl
-           hover:from-amber-600 hover:to-orange-600 transition-all duration-300
+    @apply px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500
+           text-white font-semibold rounded-xl
+           hover:from-amber-600 hover:to-orange-600
+           transition-all duration-300
            shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40
            active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply px-6 py-2.5 bg-slate-700 text-gray-200 font-semibold rounded-xl
-           hover:bg-slate-600 transition-all duration-300 border border-slate-600
-           hover:border-slate-500 active:scale-95;
+    @apply px-6 py-2.5 bg-gray-100 text-gray-800 font-semibold rounded-xl
+           hover:bg-gray-200 transition-all duration-300
+           border border-gray-300 hover:border-gray-400 active:scale-95;
+  }
+
+  html.dark .btn-secondary {
+    background-color: #334155;
+    color: #e2e8f0;
+    border-color: #475569;
+  }
+
+  html.dark .btn-secondary:hover {
+    background-color: #475569;
   }
 
   .btn-danger {
-    @apply px-6 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-xl
-           hover:from-red-600 hover:to-red-700 transition-all duration-300
+    @apply px-6 py-2.5 bg-gradient-to-r from-red-500 to-red-600
+           text-white font-semibold rounded-xl
+           hover:from-red-600 hover:to-red-700
+           transition-all duration-300
            shadow-lg shadow-red-500/25 hover:shadow-red-500/40
            active:scale-95;
   }
 
   .btn-success {
-    @apply px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-xl
-           hover:from-green-600 hover:to-emerald-600 transition-all duration-300
+    @apply px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500
+           text-white font-semibold rounded-xl
+           hover:from-green-600 hover:to-emerald-600
+           transition-all duration-300
            shadow-lg shadow-green-500/25 hover:shadow-green-500/40
            active:scale-95;
   }
 
+  /* Inputs */
   .input-field {
-    @apply w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-xl text-gray-100
-           placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50
+    @apply w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl
+           text-gray-900 placeholder-gray-400
+           focus:outline-none focus:ring-2 focus:ring-amber-500/50
            focus:border-amber-500 transition-all duration-300;
   }
 
+  html.dark .input-field {
+    background-color: #1e293b;
+    border-color: #475569;
+    color: #f1f5f9;
+  }
+
+  html.dark .input-field::placeholder {
+    color: #64748b;
+  }
+
   .select-field {
-    @apply w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-xl text-gray-100
+    @apply w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl
+           text-gray-900
            focus:outline-none focus:ring-2 focus:ring-amber-500/50
-           focus:border-amber-500 transition-all duration-300 appearance-none cursor-pointer;
+           focus:border-amber-500 transition-all duration-300
+           appearance-none cursor-pointer;
+  }
+
+  html.dark .select-field {
+    background-color: #1e293b;
+    border-color: #475569;
+    color: #f1f5f9;
   }
 
   .label-text {
-    @apply block text-sm font-medium text-gray-300 mb-1.5;
+    @apply block text-sm font-medium text-gray-700 mb-1.5;
   }
 
+  html.dark .label-text {
+    color: #d1d5db;
+  }
+
+  /* Sidebar links */
   .sidebar-link {
-    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 font-medium
-           transition-all duration-300 hover:bg-slate-700/50 hover:text-gray-100;
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl
+           text-gray-600 font-medium
+           transition-all duration-300
+           hover:bg-gray-100 hover:text-gray-900;
+  }
+
+  html.dark .sidebar-link {
+    color: #94a3b8;
+  }
+
+  html.dark .sidebar-link:hover {
+    background-color: rgba(51, 65, 85, 0.5);
+    color: #f1f5f9;
   }
 
   .sidebar-link-active {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl font-medium
-           bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-amber-400
-           border border-amber-500/20;
+           bg-amber-50 text-amber-600
+           border border-amber-200;
   }
 
+  html.dark .sidebar-link-active {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.25);
+  }
+
+  /* Typography */
   .page-title {
-    @apply text-3xl font-heading font-bold gradient-text;
+    @apply text-3xl font-heading font-bold text-gray-900;
+  }
+
+  html.dark .page-title {
+    color: #f1f5f9;
+  }
+
+  .page-subtitle {
+    @apply text-gray-500 mt-1;
+  }
+
+  html.dark .page-subtitle {
+    color: #94a3b8;
   }
 
   .section-title {
-    @apply text-xl font-heading font-semibold text-gray-100;
+    @apply text-xl font-heading font-semibold text-gray-800;
   }
 
+  html.dark .section-title {
+    color: #f1f5f9;
+  }
+
+  /* Stats card */
   .stat-card {
     @apply glass-card p-6 flex flex-col gap-2;
+  }
+
+  /* Table styles */
+  .table-header {
+    @apply bg-gray-100 text-gray-600 text-sm font-semibold;
+  }
+
+  html.dark .table-header {
+    background-color: #1e293b;
+    color: #94a3b8;
+  }
+
+  .table-row {
+    @apply border-b border-gray-100 hover:bg-gray-50
+           text-gray-800 transition-colors;
+  }
+
+  html.dark .table-row {
+    border-color: rgba(51, 65, 85, 0.4);
+    color: #e2e8f0;
+  }
+
+  html.dark .table-row:hover {
+    background-color: rgba(51, 65, 85, 0.3);
+  }
+
+  /* Status badges */
+  .badge-active {
+    @apply px-3 py-1 rounded-full text-xs font-semibold
+           bg-green-100 text-green-700;
+  }
+
+  html.dark .badge-active {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+  }
+
+  .badge-inactive {
+    @apply px-3 py-1 rounded-full text-xs font-semibold
+           bg-red-100 text-red-600;
+  }
+
+  html.dark .badge-inactive {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #f87171;
   }
 }
 
 /* ─── Utility Styles ─── */
 @layer utilities {
-  .animate-delay-100 {
-    animation-delay: 100ms;
-  }
-  .animate-delay-200 {
-    animation-delay: 200ms;
-  }
-  .animate-delay-300 {
-    animation-delay: 300ms;
-  }
-  .animate-delay-400 {
-    animation-delay: 400ms;
-  }
-  .animate-delay-500 {
-    animation-delay: 500ms;
-  }
-  .animate-delay-600 {
-    animation-delay: 600ms;
-  }
-  .animate-delay-700 {
-    animation-delay: 700ms;
-  }
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+  .animate-delay-500 { animation-delay: 500ms; }
+  .animate-delay-600 { animation-delay: 600ms; }
+  .animate-delay-700 { animation-delay: 700ms; }
 
   .text-shadow-glow {
-    text-shadow: 0 0 20px rgba(245, 158, 11, 0.5), 0 0 40px rgba(245, 158, 11, 0.3);
+    text-shadow: 0 0 20px rgba(245, 158, 11, 0.5),
+                 0 0 40px rgba(245, 158, 11, 0.3);
   }
 
   .bg-grid-pattern {
-    background-image: 
+    background-image:
       linear-gradient(rgba(245, 158, 11, 0.03) 1px, transparent 1px),
       linear-gradient(90deg, rgba(245, 158, 11, 0.03) 1px, transparent 1px);
     background-size: 60px 60px;
   }
 }
 
-/* ─── Toast Customization ─── */
+/* ─── Toast ─── */
 .react-hot-toast {
   font-family: 'Inter', sans-serif !important;
 }

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { collection, query, onSnapshot } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import api from '../../services/api';
 import DataTable from '../../components/DataTable';
 import WorkerForm from './WorkerForm';
@@ -13,7 +15,20 @@ export default function Workers() {
   const [selectedWorker, setSelectedWorker] = useState(null);
 
   useEffect(() => {
-    fetchWorkers();
+    // Real-time Firestore listener for workers collection
+    const q = query(collection(db, 'workers'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const workersData = snapshot.docs.map((doc) => doc.data());
+      workersData.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
+      setWorkers(workersData);
+      setLoading(false);
+    }, (error) => {
+      console.error('Workers listener error:', error);
+      toast.error('Failed to fetch workers');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const fetchWorkers = async () => {
@@ -55,12 +70,37 @@ export default function Workers() {
     }
   };
 
+  // Calculate balance summary
+  const totalBalance = workers.reduce((sum, w) => sum + (w.balanceAmount || 0), 0);
+  const workersWithBalance = workers.filter((w) => (w.balanceAmount || 0) > 0).length;
+
   const columns = [
     { key: 'fullName', label: 'Name' },
     { key: 'phone', label: 'Phone' },
     { key: 'designation', label: 'Designation' },
     { key: 'dailyRate', label: 'Daily Rate', render: (val) => <RupeeDisplay amount={val} /> },
     { key: 'advanceAmount', label: 'Advance', render: (val) => <RupeeDisplay amount={val || 0} /> },
+    {
+      key: 'balanceAmount',
+      label: 'Balance',
+      render: (val) => {
+        const balance = val || 0;
+        return (
+          <div className="flex items-center gap-2">
+            <span className={balance > 0 ? 'text-red-400 font-bold' : 'text-green-400'}>
+              ₹{balance.toLocaleString('en-IN')}
+            </span>
+            <span className={`rounded-full px-2 py-0.5 text-xs border ${
+              balance > 0
+                ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                : 'bg-green-500/10 text-green-400 border-green-500/20'
+            }`}>
+              {balance > 0 ? 'Pending' : 'Cleared'}
+            </span>
+          </div>
+        );
+      }
+    },
     { 
       key: 'isActive', 
       label: 'Status', 
@@ -101,6 +141,23 @@ export default function Workers() {
           <Plus className="w-4 h-4" /> Add Worker
         </button>
       </div>
+
+      {/* Balance Summary Line */}
+      {!loading && (
+        <div className="text-sm">
+          {totalBalance > 0 ? (
+            <p className="text-slate-300">
+              Total Outstanding Balance:{' '}
+              <span className="text-red-400 font-bold">₹{totalBalance.toLocaleString('en-IN')}</span>
+              {' '}across{' '}
+              <span className="text-red-400 font-bold">{workersWithBalance}</span>
+              {' '}worker{workersWithBalance !== 1 ? 's' : ''}
+            </p>
+          ) : (
+            <p className="text-green-400">All worker balances are cleared ✓</p>
+          )}
+        </div>
+      )}
 
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
         <DataTable

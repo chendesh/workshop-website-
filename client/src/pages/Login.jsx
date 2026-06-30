@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [retrying, setRetrying] = useState(false);
   const { login, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -18,8 +19,27 @@ export default function Login() {
         navigate(user.role === 'owner' ? '/owner' : '/worker');
       }
     } catch (error) {
-      console.error('Login failed', error);
-      toast.error(error.response?.data?.message || 'Invalid credentials, please try again');
+      console.error('First attempt failed:', error.code || error.message);
+
+      // Auto retry once after 2 seconds (handles Render cold start waking up)
+      setRetrying(true);
+      toast.loading('Server is waking up, retrying...', { id: 'retry-toast' });
+
+      setTimeout(async () => {
+        try {
+          const user = await login({ username: username.trim().toLowerCase(), password });
+          toast.dismiss('retry-toast');
+          setRetrying(false);
+          if (user) {
+            navigate(user.role === 'owner' ? '/owner' : '/worker');
+          }
+        } catch (finalError) {
+          console.error('Second attempt failed:', finalError.code || finalError.message);
+          toast.dismiss('retry-toast');
+          setRetrying(false);
+          toast.error(finalError.response?.data?.message || 'Invalid credentials, please try again');
+        }
+      }, 2000);
     }
   };
 
@@ -67,10 +87,10 @@ export default function Login() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || retrying}
             className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Authenticating...' : 'Sign In'}
+            {retrying ? 'Retrying...' : loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
 

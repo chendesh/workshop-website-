@@ -170,8 +170,27 @@ async function fetchReportData(periodStartStr, periodEndStr) {
         return a.workerName.localeCompare(b.workerName);
     });
 
-    return { workLogs, workersData };
+    // 3. Inventory (Materials)
+    const inventorySnap = await db.collection('inventory').get();
+    const inventoryItems = inventorySnap.docs
+      .map((doc) => doc.data())
+      .filter((item) => {
+        if (!item.purchaseDate) return false;
+        // purchaseDate stored as 'YYYY-MM-DD'
+        const itemDate = new Date(item.purchaseDate);
+        return itemDate >= startObj && itemDate <= endObj;
+      });
+
+    // Sort by purchaseDate ascending
+    inventoryItems.sort((a, b) => {
+      const da = new Date(a.purchaseDate || 0);
+      const db2 = new Date(b.purchaseDate || 0);
+      return da - db2;
+    });
+
+    return { workLogs, workersData, inventoryItems };
 }
+
 
 // ── POST /api/reports/weekly — Generate weekly Excel report ──
 export const generateWeeklyReport = async (req, res) => {
@@ -186,7 +205,7 @@ export const generateWeeklyReport = async (req, res) => {
     const startStr = formatDate(new Date(periodStart));
     const endStr = formatDate(new Date(periodEnd));
 
-    const { workLogs, workersData } = await fetchReportData(startStr, endStr);
+    const { workLogs, workersData, inventoryItems } = await fetchReportData(startStr, endStr);
 
     // ── Build Excel workbook ──
     const wb = XLSX.utils.book_new();
@@ -236,6 +255,88 @@ export const generateWeeklyReport = async (req, res) => {
     const wrkSheet = XLSX.utils.aoa_to_sheet(wrkSheetData);
     XLSX.utils.book_append_sheet(wb, wrkSheet, 'Workers Data');
 
+    // ── Section C: Materials Report Sheet ──
+    const matHeaders = [
+      'Date', 'Material Name', 'Category', 'Quantity', 'Unit',
+      'Unit Price (₹)', 'Total Amount (₹)', 'Supplier Name', 'Notes'
+    ];
+
+    let totalMatSpend = 0;
+    const matData = inventoryItems.map((item) => {
+      const totalAmt = Number(item.totalAmount) || 0;
+      totalMatSpend += totalAmt;
+      // Format date from YYYY-MM-DD to DD/MM/YYYY
+      let dateStr = item.purchaseDate || '';
+      if (dateStr && dateStr.includes('-')) {
+        const [y, m, d] = dateStr.split('-');
+        dateStr = `${d}/${m}/${y}`;
+      }
+      return [
+        dateStr,
+        item.materialName || '',
+        item.category || '',
+        Number(item.quantity) || 0,
+        item.unit || '',
+        Number(item.unitPrice) || 0,
+        totalAmt,
+        item.supplierName || '',
+        item.notes || '',
+      ];
+    });
+
+    const matSheetData = [
+      ['Materials Purchase Report'],
+      [`Period: ${startStr} to ${endStr}`],
+      [],
+      matHeaders,
+      ...matData,
+    ];
+
+    if (matData.length === 0) {
+      matSheetData.push(['No material purchases recorded for this period.']);
+    } else {
+      // Leave 1 blank row then summary
+      matSheetData.push([]);
+      matSheetData.push(['Total Items Purchased:', '', '', '', '', '', inventoryItems.length]);
+      matSheetData.push(['Total Materials Spend:', '', '', '', '', '', totalMatSpend]);
+    }
+
+    const matSheet = XLSX.utils.aoa_to_sheet(matSheetData);
+
+    // Style the header row (row index 3, 0-based) with amber fill
+    const headerRowIndex = 3; // 0-based: rows 0,1,2 are title/subtitle/blank
+    if (!matSheet['!rows']) matSheet['!rows'] = [];
+    matSheet['!rows'][headerRowIndex] = { hpx: 20 };
+
+    // Apply amber styling to header cells A4:I4 (0-based row 3)
+    const headerCols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+    headerCols.forEach((col) => {
+      const cellRef = `${col}${headerRowIndex + 1}`;
+      if (!matSheet[cellRef]) matSheet[cellRef] = { v: '', t: 's' };
+      matSheet[cellRef].s = {
+        fill: { fgColor: { rgb: 'F59E0B' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        alignment: { horizontal: 'center' },
+      };
+    });
+
+    // Bold Total Amount column (G) for data rows
+    const dataStartRow = headerRowIndex + 2; // 1-based row where data starts
+    matData.forEach((_, i) => {
+      const cellRef = `G${dataStartRow + i}`;
+      if (matSheet[cellRef]) {
+        matSheet[cellRef].s = { font: { bold: true } };
+      }
+    });
+
+    // Freeze pane at row 2 (freeze header row)
+    matSheet['!freeze'] = { xSplit: 0, ySplit: headerRowIndex + 1 };
+
+    // Auto column widths
+    matSheet['!cols'] = [14, 22, 18, 10, 8, 14, 16, 22, 30].map((w) => ({ wch: w }));
+
+    XLSX.utils.book_append_sheet(wb, matSheet, 'Materials Report');
+
     // Save file
     const fileName = `weekly-report-${startStr.replace(/\//g, '-')}.xlsx`;
     const filePath = join(REPORTS_DIR, fileName);
@@ -261,6 +362,7 @@ export const generateWeeklyReport = async (req, res) => {
   }
 };
 
+
 // ── POST /api/reports/monthly — Generate monthly PDF report ──
 export const generateMonthlyReport = async (req, res) => {
   try {
@@ -274,7 +376,7 @@ export const generateMonthlyReport = async (req, res) => {
     const startStr = formatDate(new Date(periodStart));
     const endStr = formatDate(new Date(periodEnd));
 
-    const { workLogs, workersData } = await fetchReportData(startStr, endStr);
+    const { workLogs, workersData, inventoryItems } = await fetchReportData(startStr, endStr);
 
     // ── Build PDF ──
     const doc = new jsPDF();
@@ -358,6 +460,80 @@ export const generateMonthlyReport = async (req, res) => {
         styles: { fontSize: 9 }
     });
 
+    // ── Section C: Materials Purchase Report ──
+    const wrkFinalY = doc.lastAutoTable.finalY || 54;
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Add new page if not enough space for the section
+    if (wrkFinalY > pageHeight - 50) {
+      doc.addPage();
+      doc.setFontSize(14);
+      doc.setTextColor(245, 158, 11); // amber #F59E0B
+      doc.setFont(undefined, 'bold');
+      doc.text('Materials Purchase Report', 14, 20);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(0, 0, 0);
+      // Horizontal line
+      doc.setDrawColor(245, 158, 11);
+      doc.line(14, 23, pageWidth - 14, 23);
+      doc.autoTable.previous.finalY = 27;
+    } else {
+      const matHeadingY = wrkFinalY + 14;
+      doc.setFontSize(14);
+      doc.setTextColor(245, 158, 11); // amber
+      doc.setFont(undefined, 'bold');
+      doc.text('Materials Purchase Report', 14, matHeadingY);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.setDrawColor(245, 158, 11);
+      doc.line(14, matHeadingY + 3, pageWidth - 14, matHeadingY + 3);
+      doc.autoTable.previous.finalY = matHeadingY + 7;
+    }
+
+    let totalMatSpend = 0;
+    let matBody;
+
+    if (inventoryItems.length === 0) {
+      matBody = [[{ content: 'No material purchases recorded for this period.', colSpan: 7, styles: { halign: 'center', fontStyle: 'italic', textColor: [100, 100, 100] } }]];
+    } else {
+      matBody = inventoryItems.map((item) => {
+        const totalAmt = Number(item.totalAmount) || 0;
+        totalMatSpend += totalAmt;
+        let dateStr = item.purchaseDate || '';
+        if (dateStr && dateStr.includes('-')) {
+          const [y, m, d] = dateStr.split('-');
+          dateStr = `${d}/${m}/${y}`;
+        }
+        return [
+          dateStr,
+          item.materialName || '',
+          item.category || '',
+          `${Number(item.quantity) || 0} ${item.unit || ''}`.trim(),
+          formatRupees(Number(item.unitPrice) || 0),
+          formatRupees(totalAmt),
+          item.supplierName || '—',
+        ];
+      });
+
+      // Summary rows
+      matBody.push([
+        { content: `Total Items Purchased: ${inventoryItems.length}`, colSpan: 5, styles: { fontStyle: 'bold', halign: 'right' } },
+        { content: formatRupees(totalMatSpend), colSpan: 2, styles: { fontStyle: 'bold', textColor: [245, 158, 11] } },
+      ]);
+    }
+
+    doc.autoTable({
+      startY: doc.autoTable.previous.finalY,
+      head: [['Date', 'Material Name', 'Category', 'Qty & Unit', 'Unit Price (₹)', 'Total Amount (₹)', 'Supplier']],
+      body: matBody,
+      theme: 'grid',
+      headStyles: { fillColor: [245, 158, 11], textColor: [255, 255, 255], fontStyle: 'bold' },
+      styles: { fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      tableLineColor: [200, 200, 200],
+      tableLineWidth: 0.1,
+    });
+
     // Save PDF
     const fileName = `monthly-report-${startStr.replace(/\//g, '-')}.pdf`;
     const filePath = join(REPORTS_DIR, fileName);
@@ -383,3 +559,4 @@ export const generateMonthlyReport = async (req, res) => {
     return errorResponse(res, 'Failed to generate monthly report.');
   }
 };
+

@@ -121,17 +121,17 @@ const DataTable = ({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className={stickyHeader ? 'sticky top-0 z-10' : ''}>
-            <tr className="bg-slate-800/80 border-b border-slate-700/50">
+            <tr className="bg-slate-700 border-b border-slate-600">
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider
+                  className={`px-4 py-3 text-left text-sm font-semibold text-slate-300 uppercase tracking-wider
                     ${col.sortable !== false ? 'cursor-pointer hover:text-gray-200 select-none' : ''}
                     ${col.width || ''}`}
                   onClick={() => col.sortable !== false && handleSort(col.key)}
                 >
                   <div className="flex items-center gap-1.5">
-                    {col.header}
+                    {col.header ?? col.label}
                     {col.sortable !== false && <SortIcon colKey={col.key} />}
                   </div>
                 </th>

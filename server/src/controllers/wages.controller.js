@@ -353,14 +353,27 @@ export const saveDailyWages = async (req, res) => {
       const newAdvanceAdded = Math.max(0, amount - dailyRate);
       const baseAmount = Math.min(amount, dailyRate);
       
-      // Fetch old daily wage to check previous advance added
+      // Balance = underpayment (paid less than daily rate)
+      const newBalanceAdded = Math.max(0, dailyRate - amount);
+      
+      // Fetch old daily wage to check previous advance/balance added
       const oldDoc = await docRef.get();
       const oldAdvanceAdded = oldDoc.exists ? (oldDoc.data().advanceAdded || 0) : 0;
+      const oldBalanceAdded = oldDoc.exists ? (oldDoc.data().balanceAdded || 0) : 0;
       
       const advanceDelta = newAdvanceAdded - oldAdvanceAdded;
+      const balanceDelta = newBalanceAdded - oldBalanceAdded;
+      
+      const workerUpdates = {};
       if (advanceDelta !== 0 && worker.id) {
-          const newAdvanceAmount = (worker.advanceAmount || 0) + advanceDelta;
-          batch.update(workerRef, { advanceAmount: newAdvanceAmount, updatedAt: nowISO() });
+          workerUpdates.advanceAmount = (worker.advanceAmount || 0) + advanceDelta;
+      }
+      if (balanceDelta !== 0 && worker.id) {
+          workerUpdates.balanceAmount = (worker.balanceAmount || 0) + balanceDelta;
+      }
+      if (Object.keys(workerUpdates).length > 0) {
+          workerUpdates.updatedAt = nowISO();
+          batch.update(workerRef, workerUpdates);
       }
       
       batch.set(docRef, {
@@ -368,9 +381,11 @@ export const saveDailyWages = async (req, res) => {
         date,
         workerId: record.workerId,
         workerName: record.workerName,
+        dailyRate,
         amount,
         baseAmount,
         advanceAdded: newAdvanceAdded,
+        balanceAdded: newBalanceAdded,
         status: record.status || 'not_paid', // 'paid' or 'not_paid'
         updatedAt: nowISO()
       }, { merge: true });
