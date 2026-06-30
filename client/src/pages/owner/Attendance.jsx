@@ -84,13 +84,13 @@ export default function Attendance() {
         <div className="flex flex-wrap gap-4 justify-between items-center mb-6">
           <div className="flex items-center gap-4">
             <label className="text-slate-400">Date:</label>
-            <input 
-              type="date" 
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              onKeyDown={(e) => e.preventDefault()}
-              className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
+              <input 
+                type="date" 
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                onKeyDown={(e) => e.preventDefault()}
+                className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500 [color-scheme:dark]"
+              />
           </div>
           <div className="flex gap-2">
             <button onClick={() => handleBulkMark('present')} className="px-3 py-1 bg-green-500/20 text-green-500 rounded border border-green-500/50 hover:bg-green-500/30">All Present</button>

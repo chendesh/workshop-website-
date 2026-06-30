@@ -267,7 +267,7 @@ export default function Wages() {
                 value={dailyDate}
                 onChange={(e) => setDailyDate(e.target.value)}
                 onKeyDown={(e) => e.preventDefault()}
-                className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="bg-slate-900 border border-slate-600 rounded p-1.5 text-sm text-slate-100 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500 [color-scheme:dark]"
               />
             </div>
             <div className="flex gap-2">
