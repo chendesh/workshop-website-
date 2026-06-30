@@ -431,6 +431,7 @@ export const saveDailyWages = async (req, res) => {
         advanceAdded,
         balanceAdded,
         status: record.status || 'not_paid',
+        note: record.note || '',
         updatedAt: nowISO(),
       });
 

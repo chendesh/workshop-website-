@@ -180,13 +180,13 @@ export default function Wages() {
 
       const map = {};
       wagesRes.data.data.forEach(w => {
-        map[w.workerId] = { amount: w.amount, status: w.status };
+        map[w.workerId] = { amount: w.amount, status: w.status, note: w.note || '' };
       });
 
       // Initialize missing workers with their default daily rate
       workersRes.data.data.forEach(w => {
         if (!map[w.id]) {
-          map[w.id] = { amount: w.dailyRate || 0, status: 'not_paid' };
+          map[w.id] = { amount: w.dailyRate || 0, status: 'not_paid', note: '' };
         }
       });
       setDailyWagesMap(map);
@@ -213,17 +213,29 @@ export default function Wages() {
   };
 
   const saveDailyWages = async () => {
+    // Validate notes
+    for (const w of workers) {
+      const data = dailyWagesMap[w.id];
+      if (Number(data.amount) !== Number(w.dailyRate || 0) && !data.note?.trim()) {
+        return toast.error(`Please provide a reason for the wage difference for ${w.fullName}`);
+      }
+    }
+
     setSavingDaily(true);
     try {
       const [year, month, day] = dailyDate.split('-');
       const formattedDate = `${day}/${month}/${year}`;
 
-      const records = workers.map(w => ({
-        workerId: w.id,
-        workerName: w.fullName,
-        amount: dailyWagesMap[w.id].amount,
-        status: dailyWagesMap[w.id].status
-      }));
+      const records = workers.map(w => {
+        const isDiff = Number(dailyWagesMap[w.id].amount) !== Number(w.dailyRate || 0);
+        return {
+          workerId: w.id,
+          workerName: w.fullName,
+          amount: dailyWagesMap[w.id].amount,
+          status: dailyWagesMap[w.id].status,
+          note: isDiff ? dailyWagesMap[w.id].note : ''
+        };
+      });
 
       await api.post('/wages/daily', { date: formattedDate, records });
       toast.success('Daily wages saved');
@@ -304,13 +316,24 @@ export default function Wages() {
                         <td className="p-4 text-slate-200">{worker.fullName}</td>
                         <td className="p-4 text-slate-400 text-sm">{worker.designation || '—'}</td>
                         <td className="p-4">
-                          <input
-                            type="number"
-                            min="0"
-                            value={rowData.amount}
-                            onChange={(e) => handleDailyWageChange(worker.id, 'amount', e.target.value)}
-                            className="w-28 bg-slate-900 border border-slate-700 rounded p-1.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                          />
+                          <div className="flex flex-col gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              value={rowData.amount}
+                              onChange={(e) => handleDailyWageChange(worker.id, 'amount', e.target.value)}
+                              className="w-28 bg-slate-900 border border-slate-700 rounded p-1.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            />
+                            {Number(rowData.amount) !== Number(worker.dailyRate || 0) && (
+                              <input
+                                type="text"
+                                placeholder="Reason for difference..."
+                                value={rowData.note || ''}
+                                onChange={(e) => handleDailyWageChange(worker.id, 'note', e.target.value)}
+                                className="w-48 bg-slate-900 border border-amber-500/50 rounded p-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                            )}
+                          </div>
                         </td>
                         <td className="p-4">
                           <button

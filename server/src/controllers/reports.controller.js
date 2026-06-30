@@ -146,7 +146,7 @@ async function fetchReportData(periodStartStr, periodEndStr) {
     dailyWages.forEach(w => {
         const normDate = w.date.includes('-') ? formatDate(parseDate(w.date)) : w.date;
         const key = `${normDate}_${w.workerId}`;
-        const wageAmount = w.baseAmount !== undefined ? w.baseAmount : w.amount;
+        const wageAmount = w.amount;
 
         if (!workerDataMap[key]) {
              workerDataMap[key] = {
@@ -154,11 +154,13 @@ async function fetchReportData(periodStartStr, periodEndStr) {
                  workerName: w.workerName,
                  attendance: 'unrecorded',
                  wage: wageAmount,
-                 paymentStatus: w.status
+                 paymentStatus: w.status,
+                 note: w.note || ''
              };
         } else {
              workerDataMap[key].wage = wageAmount;
              workerDataMap[key].paymentStatus = w.status;
+             workerDataMap[key].note = w.note || '';
         }
     });
 
@@ -236,14 +238,14 @@ export const generateWeeklyReport = async (req, res) => {
 
     // Section B: Workers Data
     let totalWages = 0;
-    const wrkHeaders = ['Worker Name', 'Date', 'Attendance', 'Wage (₹)', 'Payment Status'];
+    const wrkHeaders = ['Worker Name', 'Date', 'Attendance', 'Wage (₹)', 'Payment Status', 'Note'];
     const wrkData = workersData.map((w) => {
         const wage = Number(w.wage) || 0;
         totalWages += wage;
-        return [w.workerName, w.date, w.attendance, wage, w.paymentStatus === 'paid' ? 'Paid' : 'Not Paid'];
+        return [w.workerName, w.date, w.attendance, wage, w.paymentStatus === 'paid' ? 'Paid' : 'Not Paid', w.note || ''];
     });
     // Add Grand Total row
-    wrkData.push(['Grand Total', '', '', totalWages, '']);
+    wrkData.push(['Grand Total', '', '', totalWages, '', '']);
     
     const wrkSheetData = [
       ['Weekly Workers Data'],
@@ -445,15 +447,16 @@ export const generateMonthlyReport = async (req, res) => {
             w.date, 
             w.attendance, 
             formatRupees(wage), 
-            w.paymentStatus === 'paid' ? 'Paid' : 'Not Paid'
+            w.paymentStatus === 'paid' ? 'Paid' : 'Not Paid',
+            w.note || ''
         ];
     });
 
-    wrkBody.push([{ content: 'Grand Total', colSpan: 3, styles: { fontStyle: 'bold' } }, formatRupees(totalWages), '']);
+    wrkBody.push([{ content: 'Grand Total', colSpan: 3, styles: { fontStyle: 'bold' } }, formatRupees(totalWages), '', '']);
 
     doc.autoTable({
         startY: doc.autoTable.previous.finalY,
-        head: [['Worker Name', 'Date', 'Attendance', 'Wage', 'Payment Status']],
+        head: [['Worker Name', 'Date', 'Attendance', 'Wage', 'Payment Status', 'Note']],
         body: wrkBody,
         theme: 'grid',
         headStyles: { fillColor: [39, 174, 96] },
