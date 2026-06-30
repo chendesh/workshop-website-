@@ -21,6 +21,7 @@ import 'jspdf-autotable';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { RobotoRegularBase64 } from '../utils/fonts.js';
 
 // Resolve __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -382,6 +383,12 @@ export const generateMonthlyReport = async (req, res) => {
 
     // ── Build PDF ──
     const doc = new jsPDF();
+    
+    // Embed Roboto font to support ₹ symbol
+    doc.addFileToVFS('Roboto-Regular.ttf', RobotoRegularBase64);
+    doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+    doc.setFont('Roboto');
+    
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // Title
@@ -420,9 +427,18 @@ export const generateMonthlyReport = async (req, res) => {
         head: [['Date', 'Work Description', 'Amount Spent', 'Amount Received']],
         body: wlBody,
         theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185] },
-        styles: { fontSize: 9 },
-        footStyles: { fillColor: [200, 200, 200], textColor: [0, 0, 0] }
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        styles: { font: 'Roboto', fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
+        columnStyles: {
+            0: { cellWidth: 25, halign: 'center' },
+            1: { cellWidth: 'auto', halign: 'left' },
+            2: { halign: 'right', cellWidth: 35 },
+            3: { halign: 'right', cellWidth: 35 }
+        },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        tableLineColor: [200, 200, 200],
+        tableLineWidth: 0.1,
+        footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
 
     // ── Section B: Workers Data ──
@@ -459,8 +475,20 @@ export const generateMonthlyReport = async (req, res) => {
         head: [['Worker Name', 'Date', 'Attendance', 'Wage', 'Payment Status', 'Note']],
         body: wrkBody,
         theme: 'grid',
-        headStyles: { fillColor: [39, 174, 96] },
-        styles: { fontSize: 9 }
+        headStyles: { fillColor: [39, 174, 96], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        styles: { font: 'Roboto', fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
+        columnStyles: {
+            0: { halign: 'left', cellWidth: 35 },
+            1: { halign: 'center', cellWidth: 22 },
+            2: { halign: 'center', cellWidth: 22 },
+            3: { halign: 'right', cellWidth: 25 },
+            4: { halign: 'center', cellWidth: 25 },
+            5: { halign: 'left', cellWidth: 'auto' }
+        },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        tableLineColor: [200, 200, 200],
+        tableLineWidth: 0.1,
+        footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
 
     // ── Section C: Materials Purchase Report ──
@@ -530,11 +558,21 @@ export const generateMonthlyReport = async (req, res) => {
       head: [['Date', 'Material Name', 'Category', 'Qty & Unit', 'Unit Price (₹)', 'Total Amount (₹)', 'Supplier']],
       body: matBody,
       theme: 'grid',
-      headStyles: { fillColor: [245, 158, 11], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 8 },
+      headStyles: { fillColor: [245, 158, 11], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+      styles: { font: 'Roboto', fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
+      columnStyles: {
+          0: { cellWidth: 20, halign: 'center' },
+          1: { cellWidth: 'auto', halign: 'left' },
+          2: { cellWidth: 25, halign: 'left' },
+          3: { cellWidth: 20, halign: 'center' },
+          4: { cellWidth: 25, halign: 'right' },
+          5: { cellWidth: 25, halign: 'right' },
+          6: { cellWidth: 30, halign: 'left' }
+      },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       tableLineColor: [200, 200, 200],
       tableLineWidth: 0.1,
+      footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
 
     // Save PDF
