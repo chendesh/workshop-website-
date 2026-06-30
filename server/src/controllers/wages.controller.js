@@ -325,6 +325,33 @@ export const getDailyWages = async (req, res) => {
   }
 };
 
+// ── Helper: Recompute worker totals from ALL dailyWages records ──
+// This is called after every save or delete so the worker document
+// always reflects the true sum from source data — never drifts.
+const recomputeWorkerTotals = async (workerId) => {
+  const [wagesSnap, workerDoc] = await Promise.all([
+    db.collection('dailyWages').where('workerId', '==', workerId).get(),
+    db.collection('workers').doc(workerId).get(),
+  ]);
+
+  if (!workerDoc.exists) return;
+
+  let totalBalance = 0;
+  let totalAdvance = 0;
+
+  wagesSnap.forEach((doc) => {
+    const data = doc.data();
+    totalBalance += Number(data.balanceAdded) || 0;
+    totalAdvance += Number(data.advanceAdded) || 0;
+  });
+
+  await db.collection('workers').doc(workerId).update({
+    balanceAmount: totalBalance,
+    advanceAmount: totalAdvance,
+    updatedAt: nowISO(),
+  });
+};
+
 // ── POST /api/wages/daily — Save or update daily wages ──
 export const saveDailyWages = async (req, res) => {
   try {
@@ -335,47 +362,32 @@ export const saveDailyWages = async (req, res) => {
       return errorResponse(res, 'date and an array of records are required.', 400);
     }
 
+    // Track which workerIds are touched so we recompute their totals after
+    const touchedWorkerIds = new Set();
     const batch = db.batch();
 
     for (const record of records) {
-      // Create a unique deterministic ID for the day + worker
+      // Deterministic ID: same worker + same date always hits the same document.
+      // This guarantees re-saving a corrected amount OVERWRITES the old entry,
+      // not creates a duplicate.
       const docId = `DW-${date.replace(/\//g, '')}-${record.workerId}`;
       const docRef = db.collection('dailyWages').doc(docId);
-      
-      // Fetch worker to get dailyRate
-      const workerRef = db.collection('workers').doc(record.workerId);
-      const workerDoc = await workerRef.get();
+
+      // Fetch worker to get their fixed daily rate at time of payment
+      const workerDoc = await db.collection('workers').doc(record.workerId).get();
       const worker = workerDoc.exists ? workerDoc.data() : {};
-      
+
       const dailyRate = worker.dailyRate || 0;
       const amount = Number(record.amount) || 0;
-      
-      const newAdvanceAdded = Math.max(0, amount - dailyRate);
-      const baseAmount = Math.min(amount, dailyRate);
-      
+
+      // Advance = overpayment (paid more than daily rate)
+      const advanceAdded = Math.max(0, amount - dailyRate);
       // Balance = underpayment (paid less than daily rate)
-      const newBalanceAdded = Math.max(0, dailyRate - amount);
-      
-      // Fetch old daily wage to check previous advance/balance added
-      const oldDoc = await docRef.get();
-      const oldAdvanceAdded = oldDoc.exists ? (oldDoc.data().advanceAdded || 0) : 0;
-      const oldBalanceAdded = oldDoc.exists ? (oldDoc.data().balanceAdded || 0) : 0;
-      
-      const advanceDelta = newAdvanceAdded - oldAdvanceAdded;
-      const balanceDelta = newBalanceAdded - oldBalanceAdded;
-      
-      const workerUpdates = {};
-      if (advanceDelta !== 0 && worker.id) {
-          workerUpdates.advanceAmount = (worker.advanceAmount || 0) + advanceDelta;
-      }
-      if (balanceDelta !== 0 && worker.id) {
-          workerUpdates.balanceAmount = (worker.balanceAmount || 0) + balanceDelta;
-      }
-      if (Object.keys(workerUpdates).length > 0) {
-          workerUpdates.updatedAt = nowISO();
-          batch.update(workerRef, workerUpdates);
-      }
-      
+      const balanceAdded = Math.max(0, dailyRate - amount);
+      // Base amount = the portion that counts as regular pay (capped at daily rate)
+      const baseAmount = Math.min(amount, dailyRate);
+
+      // Overwrite the dailyWages document completely (no merge confusion)
       batch.set(docRef, {
         id: docId,
         date,
@@ -384,14 +396,21 @@ export const saveDailyWages = async (req, res) => {
         dailyRate,
         amount,
         baseAmount,
-        advanceAdded: newAdvanceAdded,
-        balanceAdded: newBalanceAdded,
-        status: record.status || 'not_paid', // 'paid' or 'not_paid'
-        updatedAt: nowISO()
-      }, { merge: true });
+        advanceAdded,
+        balanceAdded,
+        status: record.status || 'not_paid',
+        updatedAt: nowISO(),
+      });
+
+      touchedWorkerIds.add(record.workerId);
     }
 
+    // Write all dailyWages docs atomically first
     await batch.commit();
+
+    // Then recompute totals for every affected worker from scratch.
+    // This replaces the old delta approach and prevents any drift.
+    await Promise.all([...touchedWorkerIds].map(recomputeWorkerTotals));
 
     return successResponse(res, null, 'Daily wages saved successfully.');
   } catch (error) {
@@ -399,6 +418,35 @@ export const saveDailyWages = async (req, res) => {
     return errorResponse(res, 'Failed to save daily wages.');
   }
 };
+
+// ── DELETE /api/wages/daily/:id — Delete a daily wage record ──
+// After deletion, recomputes the worker's balance/advance from remaining records.
+export const deleteDailyWage = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const docRef = db.collection('dailyWages').doc(id);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return errorResponse(res, 'Daily wage record not found.', 404);
+    }
+
+    const { workerId } = doc.data();
+
+    // Delete the record
+    await docRef.delete();
+
+    // Recompute worker totals from all remaining records for this worker
+    await recomputeWorkerTotals(workerId);
+
+    return successResponse(res, null, 'Daily wage record deleted and worker totals recalculated.');
+  } catch (error) {
+    console.error('DeleteDailyWage error:', error);
+    return errorResponse(res, 'Failed to delete daily wage record.');
+  }
+};
+
 
 // ── GET /api/wages/daily/worker/:workerId — Get worker's daily wages ──
 export const getWorkerDailyWages = async (req, res) => {
@@ -430,5 +478,54 @@ export const getWorkerDailyWages = async (req, res) => {
   } catch (error) {
     console.error('GetWorkerDailyWages error:', error);
     return errorResponse(res, 'Failed to fetch worker daily wages.');
+  }
+};
+
+// ── POST /api/wages/recalculate-all — Recalculate ALL worker balances ──
+// Admin safety-net: fixes any stale balance/advance fields caused by
+// external Firestore edits, console deletes, or any missed update.
+export const recalculateAllWorkerBalances = async (req, res) => {
+  try {
+    const workersSnap = await db.collection('workers').get();
+
+    if (workersSnap.empty) {
+      return successResponse(res, { recalculated: 0 }, 'No workers found.');
+    }
+
+    // Recompute every worker in parallel for speed
+    // Use doc.id instead of doc.data().id to guarantee a valid document ID
+    const workerIds = workersSnap.docs.map((doc) => doc.id);
+    
+    // Use allSettled so one malformed worker doesn't crash the entire batch
+    const results = await Promise.allSettled(
+      workerIds.map(async (id) => {
+        try {
+          await recomputeWorkerTotals(id);
+        } catch (err) {
+          throw new Error(`Worker ${id}: ${err.message}`);
+        }
+      })
+    );
+
+    const failed = results.filter(r => r.status === 'rejected');
+    const succeeded = results.filter(r => r.status === 'fulfilled');
+
+    if (failed.length > 0) {
+      const errorDetails = failed.map(f => f.reason.message).join(' | ');
+      return errorResponse(
+        res,
+        `Recalculated ${succeeded.length}, but failed for ${failed.length} workers. Errors: ${errorDetails}`,
+        500
+      );
+    }
+
+    return successResponse(
+      res,
+      { recalculated: succeeded.length },
+      `Recalculated balances for ${succeeded.length} worker(s). All totals now reflect live Firestore data.`
+    );
+  } catch (error) {
+    console.error('RecalculateAllWorkerBalances error:', error);
+    return errorResponse(res, 'Failed to recalculate worker balances.');
   }
 };

@@ -5,6 +5,8 @@ import StatsCard from '../../components/StatsCard';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import RupeeDisplay from '../../components/RupeeDisplay';
+import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 // ── Workshop SVG Illustration ───────────────────────────────────
 function WorkshopIllustration() {
@@ -149,35 +151,63 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+
+    // ── Real-time listener: Active Work Orders ──────────────────
+    const workLogsQ = query(collection(db, 'workLogs'), orderBy('createdAt', 'desc'));
+    const unsubWorkLogs = onSnapshot(workLogsQ, (snapshot) => {
+      const allLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const activeLogs = allLogs.filter(log =>
+        log.status === 'In Progress' || log.status === 'Pending'
+      );
+      setStats(prev => ({ ...prev, activeWorkLogs: activeLogs.length }));
+      setRecentLogs(activeLogs.slice(0, 5));
+    }, (error) => {
+      console.error('Error fetching real-time work logs:', error);
+    });
+
+    // ── Real-time listener: Today's Attendance ──────────────────
+    // Attendance is stored in DD/MM/YYYY format — build that string for today
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const todayFormatted = `${dd}/${mm}/${yyyy}`;
+
+    const attQ = query(
+      collection(db, 'attendance'),
+      where('date', '==', todayFormatted)
+    );
+    const unsubAtt = onSnapshot(attQ, (snapshot) => {
+      const records = snapshot.docs.map(doc => doc.data());
+      const present = records.filter(r => r.status === 'present').length;
+      const absent  = records.filter(r => r.status === 'absent').length;
+      setStats(prev => ({ ...prev, todayAttendance: { present, absent } }));
+    }, (error) => {
+      console.error('Error fetching real-time attendance:', error);
+    });
+
+    return () => {
+      unsubWorkLogs();
+      unsubAtt();
+    };
   }, []);
 
   const fetchDashboardData = async () => {
     try {
-      const [workersRes, workLogsRes, attendanceRes] = await Promise.all([
+      // Attendance is handled by real-time onSnapshot above;
+      // here we only fetch workers count and outstanding balance.
+      const [workersRes, workLogsRes] = await Promise.all([
         api.get('/workers'),
         api.get('/work-logs/stats'),
-        api.get('/attendance', { params: { date: new Date().toISOString().split('T')[0] } })
       ]);
 
       const activeWorkers = workersRes.data.data.filter(w => w.isActive).length;
 
-      const attendance = attendanceRes.data.data || [];
-      const present = attendance.filter(a => a.status === 'present').length;
-      const absent = attendance.filter(a => a.status === 'absent').length;
-
-      setStats({
+      setStats(prev => ({
+        ...prev,
         totalWorkers: activeWorkers,
-        activeWorkLogs: workLogsRes.data.data.totalJobs || 0,
         totalOutstanding: workLogsRes.data.data.totalBalance || 0,
-        todayAttendance: { present, absent }
-      });
-
-      // Try fetching recent work logs for activity feed
-      try {
-        const logsRes = await api.get('/work-logs');
-        const logs = (logsRes.data.data || []).slice(0, 5);
-        setRecentLogs(logs);
-      } catch { /* ignore if work-logs fetch fails */ }
+      }));
 
     } catch (error) {
       console.error(error);

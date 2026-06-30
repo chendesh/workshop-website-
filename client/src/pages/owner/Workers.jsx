@@ -5,7 +5,7 @@ import api from '../../services/api';
 import DataTable from '../../components/DataTable';
 import WorkerForm from './WorkerForm';
 import toast from 'react-hot-toast';
-import { Plus, KeySquare, UserX, UserCheck } from 'lucide-react';
+import { Plus, KeySquare, UserX, UserCheck, RefreshCw } from 'lucide-react';
 import RupeeDisplay from '../../components/RupeeDisplay';
 
 export default function Workers() {
@@ -13,6 +13,7 @@ export default function Workers() {
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState(null);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     // Real-time Firestore listener for workers collection
@@ -67,6 +68,21 @@ export default function Workers() {
       } catch (error) {
         toast.error('Failed to reset password');
       }
+    }
+  };
+
+  const handleRecalculateAll = async () => {
+    if (!window.confirm('Recalculate balance and advance totals for ALL workers from raw Firestore data? This corrects any stale values.')) return;
+    setRecalculating(true);
+    try {
+      const res = await api.post('/wages/recalculate-all');
+      toast.success(res.data.message || 'All worker balances recalculated!');
+    } catch (error) {
+      console.error('Recalculate balances error:', error);
+      const msg = error.response?.data?.message || error.message || 'Unknown error occurred';
+      toast.error(`Failed to recalculate balances: ${msg}`, { duration: 5000 });
+    } finally {
+      setRecalculating(false);
     }
   };
 
@@ -134,12 +150,23 @@ export default function Workers() {
           <h1 className="text-2xl font-bold font-outfit text-slate-100">Workers</h1>
           <p className="text-slate-400">Manage your workforce.</p>
         </div>
-        <button
-          onClick={() => { setSelectedWorker(null); setIsFormOpen(true); }}
-          className="bg-amber-500 hover:bg-amber-600 text-slate-900 px-4 py-2 rounded-lg font-medium flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" /> Add Worker
-        </button>
+      <div className="flex items-center gap-3">
+          <button
+            onClick={handleRecalculateAll}
+            disabled={recalculating}
+            title="Recalculate balance & advance totals from raw data"
+            className="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-lg font-medium flex items-center gap-2 border border-slate-600 transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={`w-4 h-4 ${recalculating ? 'animate-spin' : ''}`} />
+            {recalculating ? 'Recalculating...' : 'Recalculate Balances'}
+          </button>
+          <button
+            onClick={() => { setSelectedWorker(null); setIsFormOpen(true); }}
+            className="bg-amber-500 hover:bg-amber-600 text-slate-900 px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Add Worker
+          </button>
+        </div>
       </div>
 
       {/* Balance Summary Line */}
