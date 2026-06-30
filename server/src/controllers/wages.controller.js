@@ -325,9 +325,17 @@ export const getDailyWages = async (req, res) => {
   }
 };
 
-// ── Helper: Recompute worker totals from ALL dailyWages records ──
-// This is called after every save or delete so the worker document
-// always reflects the true sum from source data — never drifts.
+// ── Helper: Recompute worker totals using a running cumulative ledger ──
+// Processes ALL dailyWages records in chronological order (oldest first),
+// carrying a running total forward day by day:
+//
+//   runningTotal = previousRunningTotal + (amountPaidToday − fixedDailyWage)
+//
+//   if runningTotal >= 0  → advance = runningTotal, balance = 0
+//   if runningTotal <  0  → advance = 0, balance = |runningTotal|
+//
+// This ensures overpayment credits are automatically applied against
+// future underpayments, exactly like a real-world cash ledger.
 const recomputeWorkerTotals = async (workerId) => {
   const [wagesSnap, workerDoc] = await Promise.all([
     db.collection('dailyWages').where('workerId', '==', workerId).get(),
@@ -336,18 +344,42 @@ const recomputeWorkerTotals = async (workerId) => {
 
   if (!workerDoc.exists) return;
 
-  let totalBalance = 0;
-  let totalAdvance = 0;
+  const workerData = workerDoc.data();
+  // Fallback daily rate from the worker document (used when a dailyWages
+  // record doesn't have its own dailyRate stored — e.g. legacy data).
+  const workerDailyRate = Number(workerData.dailyRate) || 0;
 
-  wagesSnap.forEach((doc) => {
-    const data = doc.data();
-    totalBalance += Number(data.balanceAdded) || 0;
-    totalAdvance += Number(data.advanceAdded) || 0;
+  // Sort records chronologically (oldest date first).
+  // Dates are stored as DD/MM/YYYY — parse them for reliable sorting.
+  const records = wagesSnap.docs.map((doc) => doc.data());
+  records.sort((a, b) => {
+    const parse = (d) =>
+      d.includes('-')
+        ? new Date(d).getTime()
+        : new Date(d.split('/').reverse().join('-')).getTime();
+    return parse(a.date) - parse(b.date);
   });
 
+  // Walk through every day in order, carrying the running total forward.
+  let runningTotal = 0;
+
+  for (const rec of records) {
+    // Use the dailyRate stored on the record (captured at time of payment)
+    // so historical rate changes are respected. Fall back to the worker's
+    // current rate if the record doesn't have one.
+    const dailyRate = Number(rec.dailyRate) || workerDailyRate;
+    const amountPaid = Number(rec.amount) || 0;
+
+    runningTotal += amountPaid - dailyRate;
+  }
+
+  // Final state after processing all days
+  const advance = runningTotal >= 0 ? runningTotal : 0;
+  const balance = runningTotal < 0 ? Math.abs(runningTotal) : 0;
+
   await db.collection('workers').doc(workerId).update({
-    balanceAmount: totalBalance,
-    advanceAmount: totalAdvance,
+    balanceAmount: balance,
+    advanceAmount: advance,
     updatedAt: nowISO(),
   });
 };
